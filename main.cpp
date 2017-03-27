@@ -40,6 +40,35 @@ typedef struct RouteData
 	~RouteData()
 	{
 		delete [] output;
+		output = NULL;
+	}
+
+	char * createRouteCommand()
+	{
+		if(output == NULL)
+			output = new char[1024];
+		memset(output, '\0', 1024);
+
+		// Determine Target
+		char target[5];
+		bool isNetwork = false;
+		if(strstr(this->flags, "G") == 0)
+		{
+			sprintf(target, "%s", "-net");
+			sprintf(output, "route add %s %s netmask %s %s", target, this->dest, this->genmask, this->iface);
+		}
+		else if(strstr(this->flags, "H") == 0)
+		{
+			sprintf(target, "%s", "-host");
+			sprintf(output, "route add %s %s netmask %s gw %s %s", target, this->dest, this->genmask, this->gateway, this->iface);
+		}
+		else
+		{
+			sprintf(target, "%s", "");
+		}
+
+
+		return output;
 	}
 
 	char * toString()
@@ -254,7 +283,7 @@ void exportRouteTable(const char * dataSource)
 
 void importRouteTable(const char * dataSource)
 {
-	FILE * fd = fopen(dataSource, "w");
+	FILE * fd = fopen(dataSource, "r");
 	if(fd == NULL)
 	{
 		printf("[RBACK-ERR]: Unable to find archive at \'%s\'\n", dataSource);
@@ -262,10 +291,59 @@ void importRouteTable(const char * dataSource)
 	}
 
 	char line[1024];
+	char * token = NULL;
+	std::vector<RouteData> routes;
 	while(fgets(line, sizeof(line), fd))
 	{
-		printf("IMPORTED: %s\n", line);
+		RouteData newRoute;
+//		printf("IMPORTED: %s", line);
+		int paramCount = 0;
+		token = strtok(line, ",");
+		while(token)
+		{
+			switch(paramCount)
+			{
+				case 0:
+					memcpy(newRoute.dest, token, strlen(token));
+					break;
+				case 1:
+					memcpy(newRoute.gateway, token, strlen(token));
+					break;
+				case 2:
+					memcpy(newRoute.genmask, token, strlen(token));
+					break;
+				case 3:
+					memcpy(newRoute.flags, token, strlen(token));
+					break;
+				case 4:
+					memcpy(newRoute.metric, token, strlen(token));
+					break;
+				case 5:
+					memcpy(newRoute.ref, token, strlen(token));
+					break;
+				case 6:
+					memcpy(newRoute.use, token, strlen(token));
+					break;
+				case 7:
+					memcpy(newRoute.iface, token, strlen(token));
+					break;
+				default:
+					printf("Unknown Parameter Count\n");
+					break;
+			}
+			paramCount++;
+			token = strtok(NULL, ",");
+		}
+		routes.push_back(newRoute);
 	}
-
 	fclose(fd);
+
+	// Create routes from imported data
+	for(std::vector<RouteData>::iterator it = routes.begin(); it != routes.end(); it++)
+	{
+		RouteData data = *it;
+		char * command = data.createRouteCommand();
+		system(command);
+	}
+	printf("Successfully imported routing information!\n");
 }
