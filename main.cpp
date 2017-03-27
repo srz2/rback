@@ -169,7 +169,7 @@ void exportRouteTable(const char * dataSource)
 	char routeDataLine[1024];
 	memset(routeDataLine, '\0', sizeof(routeDataLine));
 
-	FILE * fd = popen("route" , "r");
+	FILE * fd = popen("route -n" , "r");
 	if(fd == NULL)
 	{
 		printf("[RBACK-ERR]: Unable to retreive route table data\n");
